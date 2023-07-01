@@ -1,0 +1,4 @@
+name: IASkins
+version: '${project.version}'
+main: com.vergilprime.IASkins
+api-version: 1.20

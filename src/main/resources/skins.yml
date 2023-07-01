@@ -1,0 +1,48 @@
+emerald_skin:
+  diamond_axe: emerald_axe
+  diamond_hoe: emerald_hoe
+  diamond_pickaxe: emerald_pickaxe
+  diamond_shovel: emerald_shovel
+  diamond_sword: emerald_sword
+  netherite_axe: emerald_netherite_axe
+  netherite_hoe: emerald_netherite_hoe
+  netherite_pickaxe: emerald_netherite_pickaxe
+  netherite_shovel: emerald_netherite_shovel
+  netherite_sword: emerald_netherite_sword
+lapis_skin:
+  diamond_axe: lapis_axe
+  diamond_hoe: lapis_hoe
+  diamond_pickaxe: lapis_pickaxe
+  diamond_shovel: lapis_shovel
+  diamond_sword: lapis_sword
+  netherite_axe: lapis_netherite_axe
+  netherite_hoe: lapis_netherite_hoe
+  netherite_pickaxe: lapis_netherite_pickaxe
+  netherite_shovel: lapis_netherite_shovel
+  netherite_sword: lapis_netherite_sword
+obsidian_skin:
+  diamond_axe: obsidian_axe
+  diamond_hoe: obsidian_hoe
+  diamond_pickaxe: obsidian_pickaxe
+  diamond_shovel: obsidian_shovel
+  diamond_sword: obsidian_sword
+  netherite_axe: obsidian_netherite_axe
+  netherite_hoe: obsidian_netherite_hoe
+  netherite_pickaxe: obsidian_netherite_pickaxe
+  netherite_shovel: obsidian_netherite_shovel
+  netherite_sword: obsidian_netherite_sword
+redstone_skin:
+  diamond_axe: redstone_axe
+  diamond_hoe: redstone_hoe
+  diamond_pickaxe: redstone_pickaxe
+  diamond_shovel: redstone_shovel
+  diamond_sword: redstone_sword
+  netherite_axe: redstone_netherite_axe
+  netherite_hoe: redstone_netherite_hoe
+  netherite_pickaxe: redstone_netherite_pickaxe
+  netherite_shovel: redstone_netherite_shovel
+  netherite_sword: redstone_netherite_sword
+transistor_skin:
+  diamond_sword: transistor
+  netherite_sword: transistor_noir
+# Map<String, Map<String, String>>
