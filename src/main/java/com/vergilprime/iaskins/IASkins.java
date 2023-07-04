@@ -1,5 +1,6 @@
 package com.vergilprime.iaskins;
 
+import com.vergilprime.iaskins.controllers.PlayerController;
 import com.vergilprime.iaskins.controllers.SkinsController;
 import dev.lone.itemsadder.api.Events.ItemsAdderLoadDataEvent;
 import org.bukkit.configuration.ConfigurationSection;
@@ -9,19 +10,16 @@ import org.bukkit.event.EventHandler;
 import org.mineacademy.fo.plugin.SimplePlugin;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.logging.Level;
 
 
 public final class IASkins extends SimplePlugin {
-	public SkinsController skinsController = new SkinsController(this);
+	public PlayerController playerController;
+	public SkinsController skinsController;
 
 	public FileConfiguration skinsConfig = new YamlConfiguration();
-	public Map<String, Map<String, String>> skins;
 	public Map<String, String> skinsReversed;
-	public Map<UUID, List<String>> lostSkins;
 
 
 	@Override
@@ -47,7 +45,7 @@ public final class IASkins extends SimplePlugin {
 				skinPairs.put(itemType, section.getString(itemType));
 				skinsReversed.put(section.getString(itemType), skinName);
 			}
-			skins.put(skinName, skinPairs);
+			skinsController.skins.put(skinName, skinPairs);
 		}
 
 	}

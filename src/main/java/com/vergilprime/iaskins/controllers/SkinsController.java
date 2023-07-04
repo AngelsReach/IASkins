@@ -5,16 +5,14 @@ import com.vergilprime.iaskins.utils.ItemSkinPair;
 import dev.lone.itemsadder.api.CustomStack;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.Damageable;
-import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 public class SkinsController {
 	IASkins plugin;
+
+	public Map<String, Map<String, String>> skins;
+	public Map<UUID, List<String>> lostSkins;
 
 	public SkinsController(IASkins plugin) {
 		this.plugin = plugin;
@@ -24,127 +22,74 @@ public class SkinsController {
 	public void applySkin(Player player) {
 		ItemStack mainhand = player.getInventory().getItemInMainHand();
 		ItemStack offhand = player.getInventory().getItemInOffHand();
-		Map<String, Map<String, String>> skins = plugin.skins;
 
 		// If the player is holding a skin in their off hand
-		CustomStack skinCustomStack = CustomStack.byItemStack(offhand);
-		if (skinCustomStack == null) {
-			return;
+		if (getSkinId(offhand).isPresent() && !isSkinned(mainhand)) {
+			// Get the skin id
+			String skinId = getSkinId(offhand).get();
+			// Get the result of applying the skin to the main hand item
+			ItemStack newItem = applySkin(mainhand, skinId);
+
+
+			// Replace the original item (main hand) with the new item
+			player.getInventory().setItemInMainHand(newItem);
+			// Remove the skin (off hand)
+			player.getInventory().getItemInOffHand().setAmount(player.getInventory().getItemInOffHand().getAmount() - 1);
 		}
-		// Get the list of items that can be skinned with that skin
-		String skinName = skinCustomStack.getNamespacedID();
-
-		if (!skins.containsKey(skinName)) {
-			// item not configured as a skin item
-			return;
-		}
-
-		Map<String, String> skinPairs = skins.get(skinName);
-
-		CustomStack customStack = CustomStack.byItemStack(mainhand);
-
-		String itemType;
-		if (customStack != null) {
-			itemType = customStack.getNamespacedID();
-		} else {
-			itemType = mainhand.getType().toString();
-		}
-
-		if (!skinPairs.containsKey(itemType)) {
-			// item not configured to be skinned with that skin
-			return;
-		}
-
-		// get the itempair that matches the item and skin;
-		String skinnedType = skinPairs.get(itemType);
-
-		// Create new item with ItemsAdder
-		CustomStack newCustomStack = CustomStack.getInstance(skinnedType);
-
-		// Copy damage, title, lore, and enchants of the original item to the new item.
-
-		// If the original item is a custom item
-		ItemStack newCustomItemStack;
-		if (customStack != null) {
-			// If the displayname of the original item is not default for that itemsadder item
-			CustomStack defaultStack = CustomStack.getInstance(itemType);
-			if (!customStack.getDisplayName().equals(defaultStack.getDisplayName())) {
-				newCustomStack.setDisplayName(customStack.getDisplayName());
-			}
-
-			ItemStack customItemStack = customStack.getItemStack();
-			newCustomItemStack = newCustomStack.getItemStack();
-
-			// Apply any enchants to the new item that were on the original item
-			newCustomItemStack.addEnchantments(customItemStack.getEnchantments());
-
-			// Apply any lore to the new item that was on the original item
-			if (customItemStack.getItemMeta().hasLore()) {
-				newCustomItemStack.getItemMeta().setLore(customItemStack.getItemMeta().getLore());
-			}
-
-			// Apply any damage to the new item that was on the original item
-			newCustomItemStack.setDurability(customItemStack.getDurability());
-		} else {
-			// If the original item had a displayname
-			if (mainhand.hasItemMeta() && mainhand.getItemMeta().hasDisplayName()) {
-				newCustomStack.setDisplayName(mainhand.getItemMeta().getDisplayName());
-			}
-
-
-			newCustomItemStack = newCustomStack.getItemStack();
-
-			// Apply any enchants to the new item that were on the original item
-			newCustomStack.getItemStack().addEnchantments(mainhand.getEnchantments());
-
-			// Apply any lore to the new item that was on the original item
-			if (mainhand.hasItemMeta() && mainhand.getItemMeta().hasLore()) {
-				newCustomItemStack.getItemMeta().setLore(mainhand.getItemMeta().getLore());
-			}
-
-			ItemMeta oldMeta = mainhand.getItemMeta();
-			ItemMeta newMeta = newCustomItemStack.getItemMeta();
-
-			// Apply any damage to the new item that was on the original item
-			if (oldMeta instanceof Damageable && newMeta instanceof Damageable) {
-				((Damageable) newMeta).setDamage(((Damageable) oldMeta).getDamage());
-			}
-		}
-
-		// Replace the original item (main hand) with the new item
-		player.getInventory().setItemInMainHand(newCustomItemStack);
-		// Remove the skin (off hand)
-		player.getInventory().setItemInOffHand(null);
 	}
 
-	public String removeSkinFromMainHand(Player player) {
+	public ItemStack applySkin(ItemStack item, String skin) {
+		String itemID = CustomStack.byItemStack(item).getNamespacedID();
+		if (itemID == null) {
+			itemID = item.getType().toString();
+		}
+		ItemStack newItem = CustomStack.getInstance(skins.get(skin).get(itemID)).getItemStack();
+
+		newItem = copyData(item, newItem);
+
+		return newItem;
+	}
+
+	public void unskinMainHand(Player player) {
 		ItemStack mainhand = player.getInventory().getItemInMainHand();
-
-		CustomStack customStack = CustomStack.byItemStack(mainhand);
-
-		if (customStack == null) {
-			return null;
+		if (isSkinned(mainhand)) {
+			ItemSkinPair itemSkinPair = unskin(mainhand);
+			player.getInventory().setItemInMainHand(itemSkinPair.item);
+			giveSkin(player, itemSkinPair.skin);
 		}
+	}
 
-		String skinnedType = customStack.getNamespacedID();
-
-		// If the player is holding a custom item in their main hand
-		Optional<String> skin = getSkin(mainhand);
-		if (skin.isPresent()) {
-			// Create new item without ItemsAdder
-			ItemStack newitem = new ItemStack(mainhand.getType());
-			// Copy damage, title, lore, and enchants of the original item to the new item.
-			newitem.setItemMeta(mainhand.getItemMeta());
-			// Replace the original item (main hand) with the new item
-			player.getInventory().setItemInMainHand(newitem);
-			player.getInventory().addItem(CustomStack.getInstance(skin.get()).getItemStack());
-			return skin.get();
+	private void giveSkin(Player player, String skin) {
+		HashMap<Integer, ItemStack> leftovers = player.getInventory().addItem(CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack());
+		if (!leftovers.isEmpty()) {
+			leftovers = player.getEnderChest().addItem(CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack());
 		}
-		return null;
+		if (!leftovers.isEmpty()) {
+			storeSkin(player, skin);
+		}
+	}
+
+	public void rescueSkin(Player player, String skin) {
+		HashMap<Integer, ItemStack> leftovers = player.getEnderChest().addItem(CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack());
+		if (!leftovers.isEmpty()) {
+			storeSkin(player, skin);
+		}
+	}
+
+	private void storeSkin(Player player, String skin) {
+		if (!lostSkins.containsKey(player.getUniqueId())) {
+			lostSkins.put(player.getUniqueId(), new ArrayList<>());
+		}
+		lostSkins.get(player.getUniqueId()).add(skin);
+		saveLostSkins();
+	}
+
+	private void restoreSkins(Player player) {
+		// TODO: Restore lost skins. Any that don't fit in inv or enderchest are stored in lost skins again.
 	}
 
 	// could be moved into a Utility class and made static to call it from anywhere instead of repeating Code -yaya
-	public Optional<String> getSkin(ItemStack stack) {
+	public Optional<String> getSkinId(ItemStack stack) {
 		CustomStack customStack = CustomStack.byItemStack(stack);
 		if (customStack == null)
 			return Optional.empty();
@@ -158,39 +103,98 @@ public class SkinsController {
 
 	public void addLostSkin(Player player, String skinName) {
 		UUID uuid = player.getUniqueId();
-		if (!plugin.lostSkins.containsKey(uuid)) {
-			plugin.lostSkins.put(uuid, new ArrayList<>());
+		if (!lostSkins.containsKey(uuid)) {
+			lostSkins.put(uuid, new ArrayList<>());
 		}
-		plugin.lostSkins.get(uuid).add(skinName);
+		lostSkins.get(uuid).add(skinName);
 	}
 
 	public void removeLostSkin(Player player, String skinName) {
 		UUID uuid = player.getUniqueId();
-		if (!plugin.lostSkins.containsKey(uuid)) {
+		if (!lostSkins.containsKey(uuid)) {
 			return;
 		}
-		plugin.lostSkins.get(uuid).remove(skinName);
-		if (plugin.lostSkins.get(uuid).isEmpty()) {
-			plugin.lostSkins.remove(uuid);
+		lostSkins.get(uuid).remove(skinName);
+		if (lostSkins.get(uuid).isEmpty()) {
+			lostSkins.remove(uuid);
 		}
 	}
 
-	// Save lost skins to a yml file
+	// TODO: Save lost skins to a yml file
 	public void saveLostSkins() {
 
 	}
 
-	public ItemSkinPair removeSkinFromItem(ItemStack customItem) {
+	public ItemSkinPair unskin(ItemStack item) {
 		// If the player is holding a custom item in their main hand
-		Optional<String> skin = getSkin(customItem);
-		if (skin.isPresent()) {
-			// Create new item without ItemsAdder
-			ItemStack newitem = new ItemStack(customItem.getType());
-			// Copy damage, title, lore, and enchants of the original item to the new item.
-			newitem.setItemMeta(customItem.getItemMeta());
-			// Replace the original item (main hand) with the new item
-			return new ItemSkinPair(newitem, skin);
+		if (item == null)
+			return null;
+		if (!isSkinned(item))
+			return null;
+		Optional<String> skin = getSkinnedId(item);
+		if (!skin.isPresent())
+			return null;
+
+		// Create new item without ItemsAdder
+		ItemStack newItem = new ItemStack(item.getType());
+		// Copy damage, title, lore, and enchants of the original item to the new item.
+		// TODO: ignore displayname if it's default
+		// if (item.getItemMeta().getDisplayName().equals(CustomStack.getInstance(skin.get()).getItemStack().getItemMeta().getDisplayName()){
+		// 		newItem.getItemMeta().setDisplayName(item.getItemMeta().getDisplayName());
+		// }
+		newItem = copyData(item, newItem);
+		// Replace the original item (main hand) with the new item
+		return new ItemSkinPair(newItem, skin.get());
+	}
+
+	private ItemStack copyData(ItemStack item, ItemStack newItem) {
+		try {
+			newItem.getItemMeta().setLore(item.getItemMeta().getLore());
+		} catch (NullPointerException e) {
+			// ignore
 		}
-		return null;
+
+		try {
+			newItem.getItemMeta().setAttributeModifiers(item.getItemMeta().getAttributeModifiers());
+		} catch (NullPointerException e) {
+			// ignore
+		}
+
+		try {
+			newItem.addEnchantments(item.getEnchantments());
+		} catch (NullPointerException e) {
+			// ignore
+		}
+
+		try {
+			newItem.addEnchantments(item.getEnchantments());
+		} catch (NullPointerException e) {
+			// ignore
+		}
+
+		// TODO: ItemStack.setDurability is deprecated.
+		newItem.setDurability(item.getDurability());
+
+		return newItem;
+	}
+
+	public boolean isSkin(ItemStack item) {
+		return getSkinId(item).isPresent();
+	}
+
+	public boolean isSkinned(ItemStack item) {
+		return getSkinnedId(item).isPresent();
+	}
+
+	private Optional<String> getSkinnedId(ItemStack item) {
+		CustomStack customStack = CustomStack.byItemStack(item);
+		if (customStack == null)
+			return Optional.empty();
+		// If the custom item is a skinned item
+		String skinnedName = plugin.skinsReversed.get(customStack.getNamespacedID());
+		if (skinnedName != null) {
+			return Optional.of(customStack.getNamespacedID());
+		}
+		return Optional.empty();
 	}
 }

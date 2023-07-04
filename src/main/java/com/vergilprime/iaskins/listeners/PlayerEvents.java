@@ -30,8 +30,8 @@ public class PlayerEvents implements Listener {
 			if (skinName != null) {
 				plugin.skinsController.addLostSkin(player, skinName);
 				// Remove the skin from the item
-				plugin.skinsController.removeSkinFromItem(item);
-			} else if (plugin.skins.containsKey(stack.getNamespacedID())) {
+				plugin.skinsController.unskin(item);
+			} else if (plugin.skinsController.skins.containsKey(stack.getNamespacedID())) {
 				plugin.skinsController.addLostSkin(player, stack.getNamespacedID());
 				// Remove the skin item from the player's inventory
 			}
@@ -42,7 +42,7 @@ public class PlayerEvents implements Listener {
 	public void onPlayerRespawnEvent(PlayerRespawnEvent event) {
 		Player player = event.getPlayer();
 		UUID uuid = player.getUniqueId();
-		if (plugin.lostSkins.containsKey(uuid)) {
+		if (plugin.skinsController.lostSkins.containsKey(uuid)) {
 			player.sendMessage("You died and lost your skins. Use whatever assbrained command we come up with to retieve your lost skins.");
 		}
 	}
