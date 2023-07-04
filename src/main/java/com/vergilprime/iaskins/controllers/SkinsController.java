@@ -3,10 +3,14 @@ package com.vergilprime.iaskins.controllers;
 import com.vergilprime.iaskins.IASkins;
 import com.vergilprime.iaskins.utils.ItemSkinPair;
 import dev.lone.itemsadder.api.CustomStack;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import java.io.IOException;
 import java.util.*;
+import java.util.logging.Level;
 
 public class SkinsController {
 	IASkins plugin;
@@ -16,6 +20,7 @@ public class SkinsController {
 
 	public SkinsController(IASkins plugin) {
 		this.plugin = plugin;
+		loadLostSkins();
 	}
 
 	// https://itemsadder.devs.beer/developers/java-api/old-api
@@ -120,9 +125,44 @@ public class SkinsController {
 		}
 	}
 
-	// TODO: Save lost skins to a yml file
 	public void saveLostSkins() {
-
+		YamlConfiguration lostSkinYaml = new YamlConfiguration();
+		lostSkins.forEach((uuid, list) -> lostSkinYaml.set(uuid.toString(), list));
+		try
+		{
+			lostSkinYaml.save("lostSkins.yml");
+		}
+		catch (IOException e)
+		{
+			plugin.getLogger().log(Level.SEVERE, "lostSkins.yml couldn't be saved.", e);
+		}
+	}
+	
+	public void loadLostSkins()
+	{
+		YamlConfiguration lostSkinYaml = new YamlConfiguration();
+		try
+		{
+			lostSkinYaml.load("lostSkins.yml");
+		}
+		catch (IOException e)
+		{
+			plugin.getLogger().log(Level.SEVERE, "lostSkins.yml couldn't be loaded.", e);
+		}
+		catch (InvalidConfigurationException e)
+		{
+			plugin.getLogger().log(Level.SEVERE, "lostSkins.yml is fucked up.", e);
+		}
+		if(lostSkins == null)
+			lostSkins = new HashMap<>();
+		//Players that don't have an entry in the file won't get wiped when loading currently, but I find that scenario unlikely;
+		//If that behavior is still wanted though, just remove the null check above
+		//Or if you want to be more elaborate you could take the set of keys and check if an element isn't in lostSkins and if so remove the entry
+		//-yaya
+		lostSkinYaml.getKeys(false).forEach(s -> {
+			UUID key = UUID.fromString(s);
+			lostSkins.put(key, lostSkinYaml.getStringList(s));
+		});
 	}
 
 	public ItemSkinPair unskin(ItemStack item) {
