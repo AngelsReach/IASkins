@@ -14,8 +14,12 @@ public class PlayerController {
 		skinsController = plugin.skinsController;
 	}
 
+
+	public void restoreSkins(Player player) {
+	}
+
 	// Happens after death. If the player has a skin item in their inventory, it is removed and added to their enderchest. If enderchest is full, the item is added after the player respawns.
-	void rescueSkins(Player player) {
+	public void rescueSkins(Player player) {
 		// For every item in a player's inventory
 		PlayerInventory inventory = player.getInventory();
 		ItemStack[] contents = inventory.getContents();
@@ -44,11 +48,11 @@ public class PlayerController {
 
 	private ItemStack rescueSkin(Player player, ItemStack item) {
 		if (skinsController.isSkin(item)) {
-			skinsController.rescueSkin(player, CustomStack.byItemStack(item).getNamespacedID());
+			skinsController.storeSkin(player, CustomStack.byItemStack(item).getNamespacedID());
 			return null;
 		} else if (skinsController.isSkinned(item)) {
 			ItemSkinPair itemSkinPair = skinsController.unskin(item);
-			skinsController.rescueSkin(player, itemSkinPair.skin);
+			skinsController.storeSkin(player, itemSkinPair.getSkin());
 			return itemSkinPair.item;
 		}
 		return null;

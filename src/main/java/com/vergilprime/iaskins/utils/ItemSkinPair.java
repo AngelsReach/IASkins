@@ -10,4 +10,12 @@ public class ItemSkinPair {
 		this.item = item;
 		this.skin = skin;
 	}
+
+	public String getSkin() {
+		return skin;
+	}
+
+	public ItemStack getItem() {
+		return item;
+	}
 }
