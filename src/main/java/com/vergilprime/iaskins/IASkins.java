@@ -19,7 +19,6 @@ public final class IASkins extends SimplePlugin {
 	public SkinsController skinsController;
 
 	public FileConfiguration skinsConfig = new YamlConfiguration();
-	public Map<String, String> skinsReversed;
 
 
 	@Override
@@ -43,7 +42,7 @@ public final class IASkins extends SimplePlugin {
 			Map<String, String> skinPairs = new HashMap<>();
 			for (String itemType : section.getKeys(false)) {
 				skinPairs.put(itemType, section.getString(itemType));
-				skinsReversed.put(section.getString(itemType), skinName);
+				skinsController.skinsReversed.put(section.getString(itemType), skinName);
 			}
 			skinsController.skins.put(skinName, skinPairs);
 		}

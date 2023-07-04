@@ -6,20 +6,25 @@ import dev.lone.itemsadder.api.CustomStack;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.logging.Level;
 
 public class SkinsController {
-	IASkins plugin;
 
-	public Map<String, Map<String, String>> skins;
-	public Map<UUID, List<String>> lostSkins;
+	private final IASkins plugin;
+	public final Map<String, Map<String, String>> skins;
+	public final Map<String, String> skinsReversed;
+	private final Map<UUID, List<String>> lostSkins;
 
 	public SkinsController(IASkins plugin) {
 		this.plugin = plugin;
+		this.skins = new HashMap<>();
+		this.skinsReversed = new HashMap<>();
+		this.lostSkins = new HashMap<>();
 		loadLostSkins();
 	}
 
@@ -35,11 +40,10 @@ public class SkinsController {
 			// Get the result of applying the skin to the main hand item
 			ItemStack newItem = applySkin(mainhand, skinId);
 
-
 			// Replace the original item (main hand) with the new item
 			player.getInventory().setItemInMainHand(newItem);
 			// Remove the skin (off hand)
-			player.getInventory().getItemInOffHand().setAmount(player.getInventory().getItemInOffHand().getAmount() - 1);
+			offhand.setAmount(offhand.getAmount() - 1);
 		}
 	}
 
@@ -49,9 +53,7 @@ public class SkinsController {
 			itemID = item.getType().toString();
 		}
 		ItemStack newItem = CustomStack.getInstance(skins.get(skin).get(itemID)).getItemStack();
-
 		newItem = copyData(item, newItem);
-
 		return newItem;
 	}
 
@@ -59,161 +61,173 @@ public class SkinsController {
 		ItemStack mainhand = player.getInventory().getItemInMainHand();
 		if (isSkinned(mainhand)) {
 			ItemSkinPair itemSkinPair = unskin(mainhand);
-			player.getInventory().setItemInMainHand(itemSkinPair.item);
-			giveSkin(player, itemSkinPair.skin);
+			player.getInventory().setItemInMainHand(itemSkinPair.getItem());
+			giveOrStoreSkin(player, itemSkinPair.getSkin());
 		}
 	}
 
-	private void giveSkin(Player player, String skin) {
-		HashMap<Integer, ItemStack> leftovers = player.getInventory().addItem(CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack());
+	private void giveOrStoreSkin(Player player, String skin) {
+		ItemStack skinItem = CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack();
+		Inventory inventory = player.getInventory();
+		Map<Integer, ItemStack> leftovers = inventory.addItem(skinItem);
 		if (!leftovers.isEmpty()) {
-			leftovers = player.getEnderChest().addItem(CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack());
+			player.sendMessage("Your skin was stashed in your enderchest.");
+			inventory = player.getEnderChest();
+			leftovers = inventory.addItem(skinItem);
+		} else {
+			player.sendMessage("Your skin was successfully removed.");
 		}
 		if (!leftovers.isEmpty()) {
+			player.sendMessage("Your skin was stored in the aether, use /lostskins to recover skins when you have room.");
 			storeSkin(player, skin);
 		}
 	}
 
-	public void rescueSkin(Player player, String skin) {
-		HashMap<Integer, ItemStack> leftovers = player.getEnderChest().addItem(CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack());
-		if (!leftovers.isEmpty()) {
-			storeSkin(player, skin);
-		}
-	}
-
-	private void storeSkin(Player player, String skin) {
-		if (!lostSkins.containsKey(player.getUniqueId())) {
-			lostSkins.put(player.getUniqueId(), new ArrayList<>());
-		}
-		lostSkins.get(player.getUniqueId()).add(skin);
+	void storeSkin(Player player, String skin) {
+		UUID playerUUID = player.getUniqueId();
+		lostSkins.computeIfAbsent(playerUUID, k -> new ArrayList<>()).add(skin);
 		saveLostSkins();
 	}
 
-	private void restoreSkins(Player player) {
-		// TODO: Restore lost skins. Any that don't fit in inv or enderchest are stored in lost skins again.
-	}
-
-	// could be moved into a Utility class and made static to call it from anywhere instead of repeating Code -yaya
 	public Optional<String> getSkinId(ItemStack stack) {
 		CustomStack customStack = CustomStack.byItemStack(stack);
-		if (customStack == null)
+		if (customStack == null) {
 			return Optional.empty();
-		// If the custom item is a skinned item
-		String skinName = plugin.skinsReversed.get(customStack.getNamespacedID());
-		if (skinName != null) {
-			return Optional.of(skinName);
 		}
-		return Optional.empty();
+		// If the custom item is a skinned item
+		String skinName = skinsReversed.get(customStack.getNamespacedID());
+		return Optional.ofNullable(skinName);
 	}
 
 	public void addLostSkin(Player player, String skinName) {
 		UUID uuid = player.getUniqueId();
-		if (!lostSkins.containsKey(uuid)) {
-			lostSkins.put(uuid, new ArrayList<>());
+		List<String> playerLostSkins = lostSkins.get(uuid);
+		if (playerLostSkins != null) {
+			playerLostSkins.add(skinName);
+		} else {
+			lostSkins.put(uuid, Collections.singletonList(skinName));
 		}
-		lostSkins.get(uuid).add(skinName);
 	}
 
 	public void removeLostSkin(Player player, String skinName) {
 		UUID uuid = player.getUniqueId();
-		if (!lostSkins.containsKey(uuid)) {
-			return;
-		}
-		lostSkins.get(uuid).remove(skinName);
-		if (lostSkins.get(uuid).isEmpty()) {
-			lostSkins.remove(uuid);
+		List<String> playerLostSkins = lostSkins.get(uuid);
+		if (playerLostSkins != null) {
+			playerLostSkins.remove(skinName);
+			if (playerLostSkins.isEmpty()) {
+				lostSkins.remove(uuid);
+			}
 		}
 	}
 
 	public void saveLostSkins() {
 		YamlConfiguration lostSkinYaml = new YamlConfiguration();
 		lostSkins.forEach((uuid, list) -> lostSkinYaml.set(uuid.toString(), list));
-		try
-		{
+		try {
 			lostSkinYaml.save("lostSkins.yml");
-		}
-		catch (IOException e)
-		{
-			plugin.getLogger().log(Level.SEVERE, "lostSkins.yml couldn't be saved.", e);
+		} catch (IOException e) {
+			plugin.getLogger().severe("lostSkins.yml couldn't be saved.");
+			e.printStackTrace();
 		}
 	}
-	
-	public void loadLostSkins()
-	{
+
+	public void loadLostSkins() {
 		YamlConfiguration lostSkinYaml = new YamlConfiguration();
-		try
-		{
+		try {
 			lostSkinYaml.load("lostSkins.yml");
+		} catch (IOException | InvalidConfigurationException e) {
+			plugin.getLogger().severe("lostSkins.yml couldn't be loaded.");
+			e.printStackTrace();
 		}
-		catch (IOException e)
-		{
-			plugin.getLogger().log(Level.SEVERE, "lostSkins.yml couldn't be loaded.", e);
+
+		if (lostSkinYaml.getKeys(false) != null) {
+			lostSkinYaml.getKeys(false).forEach(key -> {
+				UUID uuid;
+				try {
+					uuid = UUID.fromString(key);
+				} catch (IllegalArgumentException e) {
+					return;
+				}
+				List<String> skinList = lostSkinYaml.getStringList(key);
+				if (!skinList.isEmpty()) {
+					lostSkins.put(uuid, skinList);
+				}
+			});
 		}
-		catch (InvalidConfigurationException e)
-		{
-			plugin.getLogger().log(Level.SEVERE, "lostSkins.yml is fucked up.", e);
-		}
-		if(lostSkins == null)
-			lostSkins = new HashMap<>();
-		//Players that don't have an entry in the file won't get wiped when loading currently, but I find that scenario unlikely;
-		//If that behavior is still wanted though, just remove the null check above
-		//Or if you want to be more elaborate you could take the set of keys and check if an element isn't in lostSkins and if so remove the entry
-		//-yaya
-		lostSkinYaml.getKeys(false).forEach(s -> {
-			UUID key = UUID.fromString(s);
-			lostSkins.put(key, lostSkinYaml.getStringList(s));
-		});
 	}
 
 	public ItemSkinPair unskin(ItemStack item) {
-		// If the player is holding a custom item in their main hand
-		if (item == null)
+		if (item == null || !isSkinned(item)) {
 			return null;
-		if (!isSkinned(item))
+		}
+
+		Optional<String> skinnedName = getSkinId(item);
+		if (!skinnedName.isPresent()) {
 			return null;
-		Optional<String> skin = getSkinnedId(item);
-		if (!skin.isPresent())
-			return null;
+		}
 
 		// Create new item without ItemsAdder
-		ItemStack newItem = new ItemStack(item.getType());
-		// Copy damage, title, lore, and enchants of the original item to the new item.
-		// TODO: ignore displayname if it's default
-		// if (item.getItemMeta().getDisplayName().equals(CustomStack.getInstance(skin.get()).getItemStack().getItemMeta().getDisplayName()){
-		// 		newItem.getItemMeta().setDisplayName(item.getItemMeta().getDisplayName());
-		// }
+		String unskinnedName = skinsReversed.get(skinnedName.get());
+		ItemStack newItem;
+		if (!CustomStack.isInRegistry(unskinnedName)) {
+			unskinnedName = item.getType().name();
+			newItem = new ItemStack(item.getType());
+		} else {
+			newItem = CustomStack.getInstance(unskinnedName).getItemStack();
+		}
 		newItem = copyData(item, newItem);
 		// Replace the original item (main hand) with the new item
-		return new ItemSkinPair(newItem, skin.get());
+		return new ItemSkinPair(newItem, unskinnedName);
 	}
 
 	private ItemStack copyData(ItemStack item, ItemStack newItem) {
-		try {
-			newItem.getItemMeta().setLore(item.getItemMeta().getLore());
-		} catch (NullPointerException e) {
-			// ignore
+		CustomStack customStack = CustomStack.byItemStack(item);
+		if (customStack != null) {
+			CustomStack defaultStack = CustomStack.getInstance(customStack.getNamespacedID());
+			if (!Objects.equals(customStack.getDisplayName(), defaultStack.getDisplayName())) {
+				ItemMeta itemMeta = newItem.getItemMeta();
+				if (itemMeta != null) {
+					itemMeta.setDisplayName(customStack.getDisplayName());
+					newItem.setItemMeta(itemMeta);
+				}
+			}
+		} else {
+			ItemMeta itemMeta = newItem.getItemMeta();
+			if (itemMeta != null && item.getItemMeta().hasDisplayName()) {
+				itemMeta.setDisplayName(item.getItemMeta().getDisplayName());
+				newItem.setItemMeta(itemMeta);
+			}
 		}
 
 		try {
-			newItem.getItemMeta().setAttributeModifiers(item.getItemMeta().getAttributeModifiers());
-		} catch (NullPointerException e) {
-			// ignore
+			ItemMeta itemMeta = newItem.getItemMeta();
+			if (itemMeta != null) {
+				itemMeta.setLore(item.getItemMeta().getLore());
+				newItem.setItemMeta(itemMeta);
+			}
+		} catch (NullPointerException ignored) {
+		}
+
+		try {
+			ItemMeta itemMeta = newItem.getItemMeta();
+			if (itemMeta != null) {
+				itemMeta.setAttributeModifiers(item.getItemMeta().getAttributeModifiers());
+				newItem.setItemMeta(itemMeta);
+			}
+		} catch (NullPointerException ignored) {
 		}
 
 		try {
 			newItem.addEnchantments(item.getEnchantments());
-		} catch (NullPointerException e) {
-			// ignore
+		} catch (NullPointerException ignored) {
 		}
 
 		try {
 			newItem.addEnchantments(item.getEnchantments());
-		} catch (NullPointerException e) {
-			// ignore
+		} catch (NullPointerException ignored) {
 		}
 
-		// TODO: ItemStack.setDurability is deprecated.
-		newItem.setDurability(item.getDurability());
+		newItem.setDurability(item.getDurability()); // TODO: ItemStack.setDurability is deprecated.
 
 		return newItem;
 	}
@@ -223,18 +237,16 @@ public class SkinsController {
 	}
 
 	public boolean isSkinned(ItemStack item) {
-		return getSkinnedId(item).isPresent();
+		return getSkinId(item).isPresent();
 	}
 
 	private Optional<String> getSkinnedId(ItemStack item) {
 		CustomStack customStack = CustomStack.byItemStack(item);
-		if (customStack == null)
+		if (customStack == null) {
 			return Optional.empty();
-		// If the custom item is a skinned item
-		String skinnedName = plugin.skinsReversed.get(customStack.getNamespacedID());
-		if (skinnedName != null) {
-			return Optional.of(customStack.getNamespacedID());
 		}
-		return Optional.empty();
+		// If the custom item is a skinned item
+		String skinnedName = skinsReversed.get(customStack.getNamespacedID());
+		return Optional.ofNullable(skinnedName);
 	}
 }
