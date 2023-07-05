@@ -3,7 +3,9 @@ package com.vergilprime.iaskins.controllers;
 import com.vergilprime.iaskins.IASkins;
 import com.vergilprime.iaskins.utils.ItemSkinPair;
 import dev.lone.itemsadder.api.CustomStack;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -16,37 +18,27 @@ import java.util.*;
 public class SkinsController {
 
 	private final IASkins plugin;
+	// Map of skins loaded from config when this object is created
 	public final Map<String, Map<String, String>> skins;
+	// A map of the skinned items to their skin in reverse
 	public final Map<String, String> skinsReversed;
-	private final Map<UUID, List<String>> lostSkins;
+	// A map of the player's UUID to a list of skins they lost
+	final Map<UUID, List<String>> lostSkins;
 
+	public FileConfiguration skinsConfig = new YamlConfiguration();
+
+	// Load the skins and lost skins from the config. Tied to ItemsAdderLoadDataEvent so
+	// everything should be reloaded when ItemsAdder reloads.
 	public SkinsController(IASkins plugin) {
 		this.plugin = plugin;
 		this.skins = new HashMap<>();
 		this.skinsReversed = new HashMap<>();
 		this.lostSkins = new HashMap<>();
+		loadSkins();
 		loadLostSkins();
 	}
 
-	// https://itemsadder.devs.beer/developers/java-api/old-api
-	public void applySkin(Player player) {
-		ItemStack mainhand = player.getInventory().getItemInMainHand();
-		ItemStack offhand = player.getInventory().getItemInOffHand();
-
-		// If the player is holding a skin in their off hand
-		if (getSkinId(offhand).isPresent() && !isSkinned(mainhand)) {
-			// Get the skin id
-			String skinId = getSkinId(offhand).get();
-			// Get the result of applying the skin to the main hand item
-			ItemStack newItem = applySkin(mainhand, skinId);
-
-			// Replace the original item (main hand) with the new item
-			player.getInventory().setItemInMainHand(newItem);
-			// Remove the skin (off hand)
-			offhand.setAmount(offhand.getAmount() - 1);
-		}
-	}
-
+	// Apply the skin provided to the item provided. Returns new item with skin applied.
 	public ItemStack applySkin(ItemStack item, String skin) {
 		String itemID = CustomStack.byItemStack(item).getNamespacedID();
 		if (itemID == null) {
@@ -57,38 +49,53 @@ public class SkinsController {
 		return newItem;
 	}
 
-	public void unskinMainHand(Player player) {
-		ItemStack mainhand = player.getInventory().getItemInMainHand();
-		if (isSkinned(mainhand)) {
-			ItemSkinPair itemSkinPair = unskin(mainhand);
-			player.getInventory().setItemInMainHand(itemSkinPair.getItem());
-			giveOrStoreSkin(player, itemSkinPair.getSkin());
+	// Gives a skin item to the player OR stashes in their enderchest OR stores in lost skins.
+	void giveOrStoreSkin(Player player, String skin, Boolean silent) {
+		Map<Integer, ItemStack> leftovers = giveSkin(player, skin, silent);
+		if (!leftovers.isEmpty()) {
+			storeSkin(player, skin, silent);
 		}
 	}
 
-	private void giveOrStoreSkin(Player player, String skin) {
+	// Gives a skin item to the player OR stashes in their enderchest OR returns leftovers.
+	Map<Integer, ItemStack> giveSkin(Player player, String skin, Boolean silent) {
 		ItemStack skinItem = CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack();
 		Inventory inventory = player.getInventory();
 		Map<Integer, ItemStack> leftovers = inventory.addItem(skinItem);
 		if (!leftovers.isEmpty()) {
-			player.sendMessage("Your skin was stashed in your enderchest.");
 			inventory = player.getEnderChest();
 			leftovers = inventory.addItem(skinItem);
+			if (leftovers.isEmpty() && !silent) {
+				player.sendMessage("Your skin was stashed in your enderchest.");
+			}
 		} else {
-			player.sendMessage("Your skin was successfully removed.");
+			if (!silent) {
+				player.sendMessage("Skin deposited in your inventory.");
+			}
 		}
-		if (!leftovers.isEmpty()) {
-			player.sendMessage("Your skin was stored in the aether, use /lostskins to recover skins when you have room.");
-			storeSkin(player, skin);
-		}
+		return leftovers;
 	}
 
-	void storeSkin(Player player, String skin) {
-		UUID playerUUID = player.getUniqueId();
-		lostSkins.computeIfAbsent(playerUUID, k -> new ArrayList<>()).add(skin);
-		saveLostSkins();
+	// Stores a skin in the aether for the player to recover later.
+	// Happens if they die or strip a skin from an item with no room for it.
+	void storeSkin(Player player, String skin, Boolean silent) {
+		Inventory inventory = player.getEnderChest();
+		ItemStack skinItem = CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack();
+		Map<Integer, ItemStack> leftovers = inventory.addItem(skinItem);
+		if (leftovers.isEmpty() && !silent) {
+			player.sendMessage("Your skin was stashed in your enderchest.");
+		} else {
+			UUID playerUUID = player.getUniqueId();
+			lostSkins.computeIfAbsent(playerUUID, k -> new ArrayList<>()).add(skin);
+			saveLostSkins();
+			if (!silent) {
+				player.sendMessage("Your skin was stored in the aether, use /lostskins to recover skins when you have room.");
+			}
+		}
+
 	}
 
+	// Gets the namespace ID from ItemsAdder if the item is a skin item.
 	public Optional<String> getSkinId(ItemStack stack) {
 		CustomStack customStack = CustomStack.byItemStack(stack);
 		if (customStack == null) {
@@ -109,6 +116,7 @@ public class SkinsController {
 		}
 	}
 
+	// Maybe deprecated
 	public void removeLostSkin(Player player, String skinName) {
 		UUID uuid = player.getUniqueId();
 		List<String> playerLostSkins = lostSkins.get(uuid);
@@ -120,6 +128,7 @@ public class SkinsController {
 		}
 	}
 
+	// Save all lost skins to the yaml file
 	public void saveLostSkins() {
 		YamlConfiguration lostSkinYaml = new YamlConfiguration();
 		lostSkins.forEach((uuid, list) -> lostSkinYaml.set(uuid.toString(), list));
@@ -131,6 +140,7 @@ public class SkinsController {
 		}
 	}
 
+	// Load all lost skins from the yaml file. Used on creation of a new SkinsController.
 	public void loadLostSkins() {
 		YamlConfiguration lostSkinYaml = new YamlConfiguration();
 		try {
@@ -156,6 +166,31 @@ public class SkinsController {
 		}
 	}
 
+	// Load all skins from the yaml file. Used on creation of a new SkinsController.
+	public void loadSkins() {
+		YamlConfiguration skinYaml = new YamlConfiguration();
+		try {
+			skinYaml.load("skins.yml");
+		} catch (IOException | InvalidConfigurationException e) {
+			plugin.getLogger().severe("skins.yml couldn't be loaded.");
+			e.printStackTrace();
+		}
+		//skins.yml the file that holds the info we need.
+		for (String skinName : skinsConfig.getKeys(false)) {
+			ConfigurationSection section = skinsConfig.getConfigurationSection(skinName);
+			if (section == null) {
+				continue;
+			}
+			Map<String, String> skinPairs = new HashMap<>();
+			for (String itemType : section.getKeys(false)) {
+				skinPairs.put(itemType, section.getString(itemType));
+				skinsReversed.put(section.getString(itemType), skinName);
+			}
+			skins.put(skinName, skinPairs);
+		}
+	}
+
+	// Given a skinned item, return the unskinned item and the namespace ID of the skin.
 	public ItemSkinPair unskin(ItemStack item) {
 		if (item == null || !isSkinned(item)) {
 			return null;
@@ -180,6 +215,7 @@ public class SkinsController {
 		return new ItemSkinPair(newItem, unskinnedName);
 	}
 
+	// Given an old item and a new item, copy title, lore, enchants, attributes and damage to the new item.
 	private ItemStack copyData(ItemStack item, ItemStack newItem) {
 		CustomStack customStack = CustomStack.byItemStack(item);
 		if (customStack != null) {
@@ -232,14 +268,17 @@ public class SkinsController {
 		return newItem;
 	}
 
+	// Is this item a configured skin?
 	public boolean isSkin(ItemStack item) {
 		return getSkinId(item).isPresent();
 	}
 
+	// Is this item a skinned item?
 	public boolean isSkinned(ItemStack item) {
 		return getSkinId(item).isPresent();
 	}
 
+	// Given a skinned item, return the namespace ID of the skin. If the item is not a skinned item, return null.
 	private Optional<String> getSkinnedId(ItemStack item) {
 		CustomStack customStack = CustomStack.byItemStack(item);
 		if (customStack == null) {
