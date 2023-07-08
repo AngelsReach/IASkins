@@ -21,7 +21,7 @@ public final class UnskinCommand extends SimpleCommand {
 		if (args.length > 0)
 			returnTell("This command does not take any arguments");
 
-		if (!hasPerm("iaskins.commands.lostskins"))
+		if (!hasPerm("iaskins.commands.unskin"))
 			returnTell("You do not have permission to use this command");
 
 		checkConsole();

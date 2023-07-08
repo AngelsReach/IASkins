@@ -121,7 +121,7 @@ public class PlayerController {
 		UUID uuid = player.getUniqueId();
 		List<String> playerLostSkins = plugin.skinsController.lostSkins.get(uuid);
 		if (playerLostSkins != null) {
-			for (Integer i = 0; i < playerLostSkins.size(); i++) {
+			for (int i = 0; i < playerLostSkins.size(); i++) {
 				Map<Integer, ItemStack> leftovers = plugin.skinsController.giveSkin(player, playerLostSkins.get(i), true);
 				if (leftovers.isEmpty()) {
 					playerLostSkins.remove(i);

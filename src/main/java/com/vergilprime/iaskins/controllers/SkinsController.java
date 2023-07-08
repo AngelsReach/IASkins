@@ -73,40 +73,38 @@ public class SkinsController {
 
 	// Gives a skin item to the player OR stashes in their enderchest OR returns leftovers.
 	Map<Integer, ItemStack> giveSkin(Player player, String skin, Boolean silent) {
-		ItemStack skinItem = CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack();
+		ItemStack skinItem = CustomStack.getInstance(skin).getItemStack();
 		Inventory inventory = player.getInventory();
 		Map<Integer, ItemStack> leftovers = inventory.addItem(skinItem);
-		if (!leftovers.isEmpty()) {
-			inventory = player.getEnderChest();
-			leftovers = inventory.addItem(skinItem);
-			if (leftovers.isEmpty() && !silent) {
-				player.sendMessage("Your skin was stashed in your enderchest.");
-			}
-		} else {
-			if (!silent) {
-				player.sendMessage("Skin deposited in your inventory.");
-			}
+		// if (!leftovers.isEmpty()) {
+		// inventory = player.getEnderChest();
+		// leftovers = inventory.addItem(skinItem);
+		// if (leftovers.isEmpty() && !silent) {
+		// player.sendMessage("Your skin was stashed in your enderchest.");
+		// }
+		// } else {
+		if (!silent) {
+			player.sendMessage("Skin deposited in your inventory.");
 		}
+		// }
 		return leftovers;
 	}
 
 	// Stores a skin in the aether for the player to recover later.
 	// Happens if they die or strip a skin from an item with no room for it.
 	void storeSkin(Player player, String skin, Boolean silent) {
-		Inventory inventory = player.getEnderChest();
-		ItemStack skinItem = CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack();
-		Map<Integer, ItemStack> leftovers = inventory.addItem(skinItem);
-		if (leftovers.isEmpty() && !silent) {
-			player.sendMessage("Your skin was stashed in your enderchest.");
-		} else {
-			UUID playerUUID = player.getUniqueId();
-			lostSkins.computeIfAbsent(playerUUID, k -> new ArrayList<>()).add(skin);
-			saveLostSkins();
-			if (!silent) {
-				player.sendMessage("Your skin was stored in the aether, use /lostskins to recover skins when you have room.");
-			}
+		// Inventory inventory = player.getEnderChest();
+		// ItemStack skinItem = CustomStack.getInstance(skins.get(skin).get("skin")).getItemStack();
+		// Map<Integer, ItemStack> leftovers = inventory.addItem(skinItem);
+		// if (leftovers.isEmpty() && !silent) {
+		// player.sendMessage("Your skin was stashed in your enderchest.");
+		// } else {
+		UUID playerUUID = player.getUniqueId();
+		lostSkins.computeIfAbsent(playerUUID, k -> new ArrayList<>()).add(skin);
+		saveLostSkins();
+		if (!silent) {
+			player.sendMessage("Your skin was stored in the aether, use /lostskins to recover skins when you have room.");
 		}
-
 	}
 
 	public void addLostSkin(Player player, String skinName) {
@@ -201,13 +199,14 @@ public class SkinsController {
 			return null;
 		}
 
-		String skinnedName = getSkinId(item);
-		if (skinnedName != null) {
+		String skinnedName = getSkinnedId(item);
+		if (skinnedName == null) {
 			return null;
 		}
 
 		// Create new item without ItemsAdder
-		String unskinnedName = skinsReversed.get(skinnedName);
+		String unskinnedName = item.getType().toString();
+		String skinName = skinsReversed.get(skinnedName);
 		ItemStack newItem;
 		if (!CustomStack.isInRegistry(unskinnedName)) {
 			unskinnedName = item.getType().name();
@@ -217,7 +216,7 @@ public class SkinsController {
 		}
 		newItem = copyData(item, newItem);
 		// Replace the original item (main hand) with the new item
-		return new ItemSkinPair(newItem, unskinnedName);
+		return new ItemSkinPair(newItem, skinName);
 	}
 
 	// Given an old item and a new item, copy title, lore, enchants, attributes and damage to the new item.
@@ -259,12 +258,7 @@ public class SkinsController {
 		}
 
 		try {
-			newItem.addEnchantments(item.getEnchantments());
-		} catch (NullPointerException ignored) {
-		}
-
-		try {
-			newItem.addEnchantments(item.getEnchantments());
+			newItem.addUnsafeEnchantments(item.getEnchantments());
 		} catch (NullPointerException ignored) {
 		}
 

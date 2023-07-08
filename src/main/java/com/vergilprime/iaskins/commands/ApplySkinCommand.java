@@ -21,7 +21,7 @@ public final class ApplySkinCommand extends SimpleCommand {
 		if (args.length > 0)
 			returnTell("This command does not take any arguments");
 
-		if (!hasPerm("iaskins.commands.lostskins"))
+		if (!hasPerm("iaskins.commands.applyskin"))
 			returnTell("You do not have permission to use this command");
 
 		checkConsole();

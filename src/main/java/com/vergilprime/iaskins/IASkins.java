@@ -5,6 +5,7 @@ import com.vergilprime.iaskins.commands.LostSkinsCommand;
 import com.vergilprime.iaskins.commands.UnskinCommand;
 import com.vergilprime.iaskins.controllers.PlayerController;
 import com.vergilprime.iaskins.controllers.SkinsController;
+import com.vergilprime.iaskins.listeners.PlayerEvents;
 import dev.lone.itemsadder.api.Events.ItemsAdderLoadDataEvent;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -32,6 +33,7 @@ public final class IASkins extends SimplePlugin {
 		registerCommand(new ApplySkinCommand(this));
 		registerCommand(new UnskinCommand(this));
 		registerCommand(new LostSkinsCommand(this));
+		registerEvents(new PlayerEvents(this));
 	}
 
 	@EventHandler
