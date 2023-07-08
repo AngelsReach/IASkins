@@ -4,14 +4,14 @@ import com.vergilprime.iaskins.IASkins;
 import org.bukkit.entity.Player;
 import org.mineacademy.fo.command.SimpleCommand;
 
-public final class UnskinCommand extends SimpleCommand {
+public final class ApplySkinCommand extends SimpleCommand {
 	IASkins plugin;
 
-	public UnskinCommand(IASkins plugin) {
-		super("unskin");
-		setDescription("Remove a skin from the item in your hand");
-		setPermission("iaskins.commands.unskin");
-		setUsage("/unskin");
+	public ApplySkinCommand(IASkins plugin) {
+		super("applyskin/skin");
+		setDescription("Apply a skin to the item in your hand");
+		setPermission("iaskins.commands.applyskin");
+		setUsage("/applyskin or /skin");
 
 		this.plugin = plugin;
 	}
@@ -27,12 +27,12 @@ public final class UnskinCommand extends SimpleCommand {
 		checkConsole();
 
 		Player player = (Player) sender;
-		boolean success = plugin.playerController.unskinMainHand(player);
+		boolean success = plugin.playerController.skinMainHand(player);
 
 		if (success) {
-			returnTell("Successfully removed skin from item in hand");
+			returnTell("Successfully applied skin to item in hand");
 		} else {
-			returnTell("Failed to remove skin from item in hand");
+			returnTell("Failed to apply skin to item in hand");
 		}
 	}
 }

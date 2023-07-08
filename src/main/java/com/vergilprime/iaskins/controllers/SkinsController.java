@@ -18,6 +18,11 @@ import java.util.*;
 public class SkinsController {
 
 	private final IASkins plugin;
+	// Where all the skins are configured
+
+	public FileConfiguration skinsConfig = new YamlConfiguration();
+	// Where the lost skins are stored
+	private final YamlConfiguration lostSkinsYml = new YamlConfiguration();
 	// Map of skins loaded from config when this object is created
 	public final Map<String, Map<String, String>> skins;
 	// A map of the skinned items to their skin in reverse
@@ -25,7 +30,6 @@ public class SkinsController {
 	// A map of the player's UUID to a list of skins they lost
 	final Map<UUID, List<String>> lostSkins;
 
-	public FileConfiguration skinsConfig = new YamlConfiguration();
 
 	// Load the skins and lost skins from the config. Tied to ItemsAdderLoadDataEvent so
 	// everything should be reloaded when ItemsAdder reloads.
@@ -40,12 +44,22 @@ public class SkinsController {
 
 	// Apply the skin provided to the item provided. Returns new item with skin applied.
 	public ItemStack applySkin(ItemStack item, String skin) {
-		String itemID = CustomStack.byItemStack(item).getNamespacedID();
-		if (itemID == null) {
-			itemID = item.getType().toString();
+		boolean debug = plugin.debug;
+		if (debug) plugin.getServer().broadcastMessage("SkinID = " + skin);
+		CustomStack customStack = CustomStack.byItemStack(item);
+		String itemID;
+		if (customStack == null) {
+			if (debug) plugin.getServer().broadcastMessage("ItemStack provided is not an ItemsAdder item.");
+			itemID = item.getType().toString().toLowerCase();
+		} else {
+			itemID = customStack.getId();
 		}
-		ItemStack newItem = CustomStack.getInstance(skins.get(skin).get(itemID)).getItemStack();
+		if (debug) plugin.getServer().broadcastMessage("ItemID = " + itemID);
+		String skinnedId = skins.get(skin).get(itemID);
+		ItemStack newItem = CustomStack.getInstance(skinnedId).getItemStack();
+		if (debug) plugin.getServer().broadcastMessage("newItem created.");
 		newItem = copyData(item, newItem);
+		if (debug) plugin.getServer().broadcastMessage("newItem data copied from old item.");
 		return newItem;
 	}
 
@@ -95,17 +109,6 @@ public class SkinsController {
 
 	}
 
-	// Gets the namespace ID from ItemsAdder if the item is a skin item.
-	public Optional<String> getSkinId(ItemStack stack) {
-		CustomStack customStack = CustomStack.byItemStack(stack);
-		if (customStack == null) {
-			return Optional.empty();
-		}
-		// If the custom item is a skinned item
-		String skinName = skinsReversed.get(customStack.getNamespacedID());
-		return Optional.ofNullable(skinName);
-	}
-
 	public void addLostSkin(Player player, String skinName) {
 		UUID uuid = player.getUniqueId();
 		List<String> playerLostSkins = lostSkins.get(uuid);
@@ -128,49 +131,12 @@ public class SkinsController {
 		}
 	}
 
-	// Save all lost skins to the yaml file
-	public void saveLostSkins() {
-		YamlConfiguration lostSkinYaml = new YamlConfiguration();
-		lostSkins.forEach((uuid, list) -> lostSkinYaml.set(uuid.toString(), list));
-		try {
-			lostSkinYaml.save("lostSkins.yml");
-		} catch (IOException e) {
-			plugin.getLogger().severe("lostSkins.yml couldn't be saved.");
-			e.printStackTrace();
-		}
-	}
-
-	// Load all lost skins from the yaml file. Used on creation of a new SkinsController.
-	public void loadLostSkins() {
-		YamlConfiguration lostSkinYaml = new YamlConfiguration();
-		try {
-			lostSkinYaml.load("lostSkins.yml");
-		} catch (IOException | InvalidConfigurationException e) {
-			plugin.getLogger().severe("lostSkins.yml couldn't be loaded.");
-			e.printStackTrace();
-		}
-
-		if (lostSkinYaml.getKeys(false) != null) {
-			lostSkinYaml.getKeys(false).forEach(key -> {
-				UUID uuid;
-				try {
-					uuid = UUID.fromString(key);
-				} catch (IllegalArgumentException e) {
-					return;
-				}
-				List<String> skinList = lostSkinYaml.getStringList(key);
-				if (!skinList.isEmpty()) {
-					lostSkins.put(uuid, skinList);
-				}
-			});
-		}
-	}
-
 	// Load all skins from the yaml file. Used on creation of a new SkinsController.
 	public void loadSkins() {
-		YamlConfiguration skinYaml = new YamlConfiguration();
+		plugin.saveResource("skins.yml", false);
+		String path = plugin.getDataFolder() + "/skins.yml";
 		try {
-			skinYaml.load("skins.yml");
+			skinsConfig.load(path);
 		} catch (IOException | InvalidConfigurationException e) {
 			plugin.getLogger().severe("skins.yml couldn't be loaded.");
 			e.printStackTrace();
@@ -190,19 +156,58 @@ public class SkinsController {
 		}
 	}
 
+	// Load all lost skins from the yaml file. Used on creation of a new SkinsController.
+	public void loadLostSkins() {
+		plugin.saveResource("lostSkins.yml", false);
+		String path = plugin.getDataFolder() + "/lostSkins.yml";
+		try {
+			lostSkinsYml.load(path);
+
+			if (lostSkinsYml.getKeys(false) != null) {
+				lostSkinsYml.getKeys(false).forEach(key -> {
+					UUID uuid;
+					try {
+						uuid = UUID.fromString(key);
+					} catch (IllegalArgumentException e) {
+						return;
+					}
+					List<String> lostSkinList = lostSkinsYml.getStringList(key);
+					if (!lostSkinList.isEmpty()) {
+						lostSkins.put(uuid, lostSkinList);
+					}
+				});
+			}
+		} catch (IOException | InvalidConfigurationException e) {
+			plugin.getLogger().severe("lostSkins.yml couldn't be loaded.");
+			e.printStackTrace();
+		}
+	}
+
+	// Save all lost skins to the yaml file
+	public void saveLostSkins() {
+		String path = plugin.getDataFolder() + "/lostSkins.yml";
+		lostSkins.forEach((uuid, list) -> lostSkinsYml.set(uuid.toString(), list));
+		try {
+			lostSkinsYml.save(path);
+		} catch (IOException e) {
+			plugin.getLogger().severe("lostSkins.yml couldn't be saved.");
+			e.printStackTrace();
+		}
+	}
+
 	// Given a skinned item, return the unskinned item and the namespace ID of the skin.
 	public ItemSkinPair unskin(ItemStack item) {
 		if (item == null || !isSkinned(item)) {
 			return null;
 		}
 
-		Optional<String> skinnedName = getSkinId(item);
-		if (!skinnedName.isPresent()) {
+		String skinnedName = getSkinId(item);
+		if (skinnedName != null) {
 			return null;
 		}
 
 		// Create new item without ItemsAdder
-		String unskinnedName = skinsReversed.get(skinnedName.get());
+		String unskinnedName = skinsReversed.get(skinnedName);
 		ItemStack newItem;
 		if (!CustomStack.isInRegistry(unskinnedName)) {
 			unskinnedName = item.getType().name();
@@ -269,23 +274,39 @@ public class SkinsController {
 	}
 
 	// Is this item a configured skin?
-	public boolean isSkin(ItemStack item) {
-		return getSkinId(item).isPresent();
+	public boolean isSkin(ItemStack stack) {
+		CustomStack customStack = CustomStack.byItemStack(stack);
+		if (customStack == null) {
+			return false;
+		}
+		String namespacedId = customStack.getNamespacedID();
+		return skins.containsKey(namespacedId);
 	}
 
 	// Is this item a skinned item?
-	public boolean isSkinned(ItemStack item) {
-		return getSkinId(item).isPresent();
+	public boolean isSkinned(ItemStack stack) {
+		CustomStack customStack = CustomStack.byItemStack(stack);
+		if (customStack == null) {
+			return false;
+		}
+		String namespacedId = customStack.getNamespacedID();
+		return skinsReversed.containsKey(namespacedId);
+	}
+
+
+	// Gets the namespace ID from ItemsAdder if the item is a skin item.
+	public String getSkinId(ItemStack stack) {
+		if (isSkin(stack)) {
+			return CustomStack.byItemStack(stack).getNamespacedID();
+		}
+		return null;
 	}
 
 	// Given a skinned item, return the namespace ID of the skin. If the item is not a skinned item, return null.
-	private Optional<String> getSkinnedId(ItemStack item) {
-		CustomStack customStack = CustomStack.byItemStack(item);
-		if (customStack == null) {
-			return Optional.empty();
+	private String getSkinnedId(ItemStack stack) {
+		if (isSkinned(stack)) {
+			return CustomStack.byItemStack(stack).getNamespacedID();
 		}
-		// If the custom item is a skinned item
-		String skinnedName = skinsReversed.get(customStack.getNamespacedID());
-		return Optional.ofNullable(skinnedName);
+		return null;
 	}
 }
