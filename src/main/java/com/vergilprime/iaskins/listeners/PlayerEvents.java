@@ -17,7 +17,7 @@ public class PlayerEvents implements Listener {
 	@EventHandler
 	public void onPlayerDeathEvent(PlayerDeathEvent event) {
 		Player player = event.getEntity();
-		plugin.playerController.rescueSkins(player);
+		plugin.playerController.rescueSkins(player, event.getDrops());
 	}
 
 	@EventHandler
