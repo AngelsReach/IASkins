@@ -73,7 +73,7 @@ public class SkinsController {
 	}
 
 	// Gives a skin item to the player OR stashes in their enderchest OR returns leftovers.
-	Map<Integer, ItemStack> giveSkin(Player player, String skin, Boolean silent) {
+	public Map<Integer, ItemStack> giveSkin(Player player, String skin, Boolean silent) {
 		ItemStack skinItem = CustomStack.getInstance(skin).getItemStack();
 		Inventory inventory = player.getInventory();
 		Map<Integer, ItemStack> leftovers = inventory.addItem(skinItem);
@@ -162,7 +162,7 @@ public class SkinsController {
 		try {
 			lostSkinsYml.load(path);
 
-			if (lostSkinsYml.getKeys(false) != null) {
+			if (!lostSkinsYml.getKeys(false).isEmpty()) {
 				lostSkinsYml.getKeys(false).forEach(key -> {
 					UUID uuid;
 					try {
