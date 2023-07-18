@@ -25,4 +25,13 @@ public class PlayerEvents implements Listener {
 		Player player = event.getPlayer();
 		plugin.playerController.restoreSkins(player);
 	}
+
+	//@EventHandler
+	//public void onPlayerItemBreakEvent(PlayerItemBreakEvent event) {
+	//	Player player = event.getPlayer();
+	//	if (plugin.skinsController.isSkinned(event.getBrokenItem())) {
+	//		String skinname = plugin.skinsController.unskin(event.getBrokenItem()).getSkin();
+	//		plugin.skinsController.giveOrStoreSkin(player, skinname, true);
+	//	}
+	//}
 }

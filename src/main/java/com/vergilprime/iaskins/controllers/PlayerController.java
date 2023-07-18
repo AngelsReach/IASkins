@@ -68,6 +68,7 @@ public class PlayerController {
 	public List<ItemStack> rescueSkins(Player player, List<ItemStack> contents) {
 		for (int i = 0; i < contents.size(); i++)
 			contents.set(i, rescueSkin(player, contents.get(i)));
+
 		return contents;
 	}
 
@@ -81,7 +82,7 @@ public class PlayerController {
 			plugin.skinsController.storeSkin(player, itemSkinPair.getSkin(), true);
 			return itemSkinPair.item;
 		}
-		return item;
+		return null;
 	}
 
 	// Happens after respawn. If the player has lost skins, they are restored.

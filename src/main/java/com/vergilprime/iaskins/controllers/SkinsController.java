@@ -10,6 +10,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.io.IOException;
@@ -64,7 +65,7 @@ public class SkinsController {
 	}
 
 	// Gives a skin item to the player OR stashes in their enderchest OR stores in lost skins.
-	void giveOrStoreSkin(Player player, String skin, Boolean silent) {
+	public void giveOrStoreSkin(Player player, String skin, Boolean silent) {
 		Map<Integer, ItemStack> leftovers = giveSkin(player, skin, silent);
 		if (!leftovers.isEmpty()) {
 			storeSkin(player, skin, silent);
@@ -222,6 +223,7 @@ public class SkinsController {
 	// Given an old item and a new item, copy title, lore, enchants, attributes and damage to the new item.
 	private ItemStack copyData(ItemStack item, ItemStack newItem) {
 		CustomStack customStack = CustomStack.byItemStack(item);
+
 		if (customStack != null) {
 			CustomStack defaultStack = CustomStack.getInstance(customStack.getNamespacedID());
 			if (!Objects.equals(customStack.getDisplayName(), defaultStack.getDisplayName())) {
@@ -262,9 +264,13 @@ public class SkinsController {
 		} catch (NullPointerException ignored) {
 		}
 
-		newItem.setDurability(item.getDurability()); // TODO: ItemStack.setDurability is deprecated.
+		Damageable damageableMeta = (Damageable) item.getItemMeta();
+		int damage = damageableMeta.getDamage();
 
-		return newItem;
+		CustomStack newCustomStack = CustomStack.byItemStack(newItem);
+		newCustomStack.setDurability(newCustomStack.getMaxDurability() - damage);
+
+		return newCustomStack.getItemStack();
 	}
 
 	// Is this item a configured skin?
