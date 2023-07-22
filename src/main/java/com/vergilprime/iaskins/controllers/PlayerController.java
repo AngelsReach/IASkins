@@ -67,7 +67,9 @@ public class PlayerController {
 	// In the event of player death, each item must be stripped of their skin. The item should drop, and the skin should be stored for later.
 	public List<ItemStack> rescueSkins(Player player, List<ItemStack> contents) {
 		for (int i = 0; i < contents.size(); i++)
-			contents.set(i, rescueSkin(player, contents.get(i)));
+			if (plugin.skinsController.isSkinned(contents.get(i)) || plugin.skinsController.isSkin(contents.get(i))) {
+				contents.set(i, rescueSkin(player, contents.get(i)));
+			}
 
 		return contents;
 	}
@@ -82,7 +84,7 @@ public class PlayerController {
 			plugin.skinsController.storeSkin(player, itemSkinPair.getSkin(), true);
 			return itemSkinPair.item;
 		}
-		return null;
+		return item;
 	}
 
 	// Happens after respawn. If the player has lost skins, they are restored.
