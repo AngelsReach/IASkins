@@ -10,8 +10,8 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.Damageable;
 
 import java.io.IOException;
 import java.util.*;
@@ -223,7 +223,6 @@ public class SkinsController {
 	// Given an old item and a new item, copy title, lore, enchants, attributes and damage to the new item.
 	private ItemStack copyData(ItemStack item, ItemStack newItem) {
 		CustomStack customStack = CustomStack.byItemStack(item);
-
 		if (customStack != null) {
 			CustomStack defaultStack = CustomStack.getInstance(customStack.getNamespacedID());
 			if (!Objects.equals(customStack.getDisplayName(), defaultStack.getDisplayName())) {
@@ -264,13 +263,16 @@ public class SkinsController {
 		} catch (NullPointerException ignored) {
 		}
 
-		Damageable damageableMeta = (Damageable) item.getItemMeta();
-		int damage = damageableMeta.getDamage();
+		CustomStack newCustomItem = CustomStack.byItemStack(newItem);
+		if (newCustomItem != null) {
+			newCustomItem.setDurability(newCustomItem.getMaxDurability() - ((Damageable) item.getItemMeta()).getDamage());
+			newItem = newCustomItem.getItemStack();
+		} else {
+			((Damageable) newItem.getItemMeta()).setDamage(((Damageable) item.getItemMeta()).getDamage());
+		}
 
-		CustomStack newCustomStack = CustomStack.byItemStack(newItem);
-		newCustomStack.setDurability(newCustomStack.getMaxDurability() - damage);
 
-		return newCustomStack.getItemStack();
+		return newItem;
 	}
 
 	// Is this item a configured skin?
@@ -298,6 +300,9 @@ public class SkinsController {
 	public String getSkinId(ItemStack stack) {
 		if (isSkin(stack)) {
 			return CustomStack.byItemStack(stack).getNamespacedID();
+		} else if (isSkinned(stack)) {
+			String skinnedName = getSkinnedId(stack);
+			return (skinsReversed.get(skinnedName));
 		}
 		return null;
 	}
